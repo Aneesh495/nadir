@@ -1,0 +1,34 @@
+# Mercury build artifacts
+Mercury/
+*.mh
+*.err
+*.init
+*.c
+*.o
+*.pic_o
+*.a
+*.so
+*.dylib
+*.bundle
+*.d
+*.int
+*.int2
+*.int3
+*.opt
+*.trans_opt
+*.analysis
+
+# Binaries
+bin/
+nadir
+test_runner
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
