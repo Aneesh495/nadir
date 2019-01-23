@@ -1,0 +1,3 @@
+# Mercury compiler configuration options
+MCFLAGS = --intermodule-optimization -O3
+MCFLAGS-nadir = --intermodule-optimization -O3
