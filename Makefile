@@ -7,18 +7,24 @@ BENCH_DIR = benchmarks
 
 .PHONY: all clean test bench verify sim
 
-all: $(BIN_DIR)/nadir
+all: $(BIN_DIR)/nadir $(BIN_DIR)/test_runner
 
 $(BIN_DIR)/nadir:
 	mkdir -p $(BIN_DIR)
 	cd $(SRC_DIR) && $(MMC) --make nadir
 	cp $(SRC_DIR)/nadir $(BIN_DIR)/nadir
 
+$(BIN_DIR)/test_runner:
+	mkdir -p $(BIN_DIR)
+	cd $(SRC_DIR) && $(MMC) --make test_runner
+	cp $(SRC_DIR)/test_runner $(BIN_DIR)/test_runner
+
 test: all
 	@echo "Running verification checks..."
 	$(PYTHON) scripts/verify_no_em_dashes.py
-	@echo "Running test suite..."
-	cd $(TESTS_DIR) && $(MMC) --make test_runner && ./test_runner
+	@echo "Running Mercury test runner..."
+	$(BIN_DIR)/test_runner
+	@echo "Running Python test suites..."
 	$(PYTHON) -m unittest discover -s tests -p "test_*.py"
 
 bench: all
