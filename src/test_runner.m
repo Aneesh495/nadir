@@ -11,13 +11,41 @@
 :- use_module nadir_core.astro.
 :- import_module nadir_core.astro.constants.
 :- import_module nadir_core.astro.temporal.
+:- import_module nadir_core.astro.vec3.
 :- import_module float, int, list, string, math.
 
 main(!IO) :-
     io.write_string("=== Running NADIR Astrodynamics Test Suite ===\n", !IO),
     test_temporal(!IO),
     test_constants(!IO),
+    test_vec3(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_vec3(io::di, io::uo) is det.
+test_vec3(!IO) :-
+    I = vec3_unit_x,
+    J = vec3_unit_y,
+    K = vec3_cross(I, J),
+    DotIJ = vec3_dot(I, J),
+    ( if abs(DotIJ) < 1.0e-12 then
+        io.write_string("  [PASS] Orthogonal vector dot product equals zero\n", !IO)
+      else
+        io.write_string("  [FAIL] Orthogonal vector dot product failed\n", !IO)
+    ),
+    ( if (abs(K ^ v_x) < 1.0e-12, abs(K ^ v_y) < 1.0e-12, abs(K ^ v_z - 1.0) < 1.0e-12) then
+        io.write_string("  [PASS] Cross product unit_x x unit_y equals unit_z\n", !IO)
+      else
+        io.write_string("  [FAIL] Cross product unit_x x unit_y failed\n", !IO)
+    ),
+    % Test rotation matrix around Z by 90 degrees
+    Rz = mat3_rot_z(half_pi),
+    RotatedI = mat3_mul_vec(Rz, I),
+    Dist = vec3_dist(RotatedI, J),
+    ( if Dist < 1.0e-12 then
+        io.write_string("  [PASS] Rz(pi/2) rotation maps unit_x to unit_y\n", !IO)
+      else
+        io.write_string("  [FAIL] Rz rotation failed\n", !IO)
+    ).
 
 :- pred test_constants(io::di, io::uo) is det.
 test_constants(!IO) :-
