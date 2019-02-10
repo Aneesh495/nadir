@@ -12,6 +12,7 @@
 :- import_module nadir_core.astro.constants.
 :- import_module nadir_core.astro.temporal.
 :- import_module nadir_core.astro.vec3.
+:- import_module nadir_core.astro.coords.
 :- import_module float, int, list, string, math.
 
 main(!IO) :-
@@ -19,7 +20,48 @@ main(!IO) :-
     test_temporal(!IO),
     test_constants(!IO),
     test_vec3(!IO),
+    test_coords(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_coords(io::di, io::uo) is det.
+test_coords(!IO) :-
+    % Test Site: Svalbard Ground Station (78.2297 deg N, 15.4078 deg E, 450 m alt)
+    LatRad = deg_to_rad(78.2297),
+    LonRad = deg_to_rad(15.4078),
+    AltM = 450.0,
+    Geo = geodetic(LatRad, LonRad, AltM),
+    Ecef = geodetic_to_ecef(Geo),
+    GeoRT = ecef_to_geodetic(Ecef),
+    LatErr = abs(GeoRT ^ geo_lat - LatRad),
+    LonErr = abs(GeoRT ^ geo_lon - LonRad),
+    AltErr = abs(GeoRT ^ geo_alt - AltM),
+    ( if (LatErr < 1.0e-9, LonErr < 1.0e-9, AltErr < 1.0e-3) then
+        io.write_string("  [PASS] Geodetic <-> ECEF round trip (sub-millimeter precision)\n", !IO)
+      else
+        io.format("  [FAIL] Geodetic round trip error: lat=%e, lon=%e, alt=%e\n",
+            [f(LatErr), f(LonErr), f(AltErr)], !IO)
+    ),
+    % Test ECI <-> ECEF round trip
+    R_eci = vec3(7000000.0, 1000000.0, 2000000.0),
+    Gmst = 1.234567,
+    R_ecef = eci_to_ecef(R_eci, Gmst),
+    R_eci_rt = ecef_to_eci(R_ecef, Gmst),
+    EciDist = vec3_dist(R_eci, R_eci_rt),
+    ( if EciDist < 1.0e-9 then
+        io.write_string("  [PASS] ECI <-> ECEF coordinate rotation round trip\n", !IO)
+      else
+        io.format("  [FAIL] ECI round trip distance: %e\n", [f(EciDist)], !IO)
+    ),
+    % Test Topocentric: point 500 km directly above site
+    ZenithGeo = geodetic(LatRad, LonRad, AltM + 500000.0),
+    ZenithEcef = geodetic_to_ecef(ZenithGeo),
+    Topo = ecef_to_topocentric(Geo, ZenithEcef),
+    ElDeg = rad_to_deg(Topo ^ topo_elevation),
+    ( if abs(ElDeg - 90.0) < 1.0e-6 then
+        io.write_string("  [PASS] Zenith point produces exactly 90 degree elevation\n", !IO)
+      else
+        io.format("  [FAIL] Expected 90.0 deg elevation, got %f\n", [f(ElDeg)], !IO)
+    ).
 
 :- pred test_vec3(io::di, io::uo) is det.
 test_vec3(!IO) :-

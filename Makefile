@@ -5,17 +5,14 @@ SRC_DIR = src
 TESTS_DIR = tests
 BENCH_DIR = benchmarks
 
-.PHONY: all clean test bench verify sim
+.PHONY: all clean test bench verify sim build
 
-all: $(BIN_DIR)/nadir $(BIN_DIR)/test_runner
+all: build
 
-$(BIN_DIR)/nadir:
+build:
 	mkdir -p $(BIN_DIR)
 	cd $(SRC_DIR) && $(MMC) --make nadir
 	cp $(SRC_DIR)/nadir $(BIN_DIR)/nadir
-
-$(BIN_DIR)/test_runner:
-	mkdir -p $(BIN_DIR)
 	cd $(SRC_DIR) && $(MMC) --make test_runner
 	cp $(SRC_DIR)/test_runner $(BIN_DIR)/test_runner
 
