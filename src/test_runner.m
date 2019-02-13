@@ -13,6 +13,7 @@
 :- import_module nadir_core.astro.temporal.
 :- import_module nadir_core.astro.vec3.
 :- import_module nadir_core.astro.coords.
+:- import_module nadir_core.astro.kepler.
 :- import_module float, int, list, string, math.
 
 main(!IO) :-
@@ -21,7 +22,57 @@ main(!IO) :-
     test_constants(!IO),
     test_vec3(!IO),
     test_coords(!IO),
+    test_kepler(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_kepler(io::di, io::uo) is det.
+test_kepler(!IO) :-
+    % 1. LEO Sun-Synchronous Orbit: a = 6900 km, e = 0.0015, i = 97.5 deg
+    A0 = 6900000.0,
+    E0 = 0.0015,
+    I0 = deg_to_rad(97.5),
+    Raan0 = deg_to_rad(45.0),
+    ArgP0 = deg_to_rad(30.0),
+    Nu0 = deg_to_rad(60.0),
+    Kep0 = keplerian_elements(A0, E0, I0, Raan0, ArgP0, Nu0),
+    State = kepler_to_rv(Kep0),
+    KepRec = rv_to_kepler(State),
+    AErr = abs(KepRec ^ kep_a - A0) / A0,
+    EErr = abs(KepRec ^ kep_e - E0),
+    IErr = abs(KepRec ^ kep_i - I0),
+    ( if (AErr < 1.0e-7, EErr < 1.0e-7, IErr < 1.0e-7) then
+        io.write_string("  [PASS] Keplerian <-> Cartesian state vector round trip\n", !IO)
+      else
+        io.format("  [FAIL] Keplerian round trip error: a_err=%e, e_err=%e, i_err=%e\n",
+            [f(AErr), f(EErr), f(IErr)], !IO)
+    ),
+    % 2. Kepler Equation Halley solver precision
+    Ecc = 0.25,
+    M = 1.25,
+    E_anom = mean_to_eccentric_anomaly(M, Ecc),
+    Resid = abs(E_anom - Ecc * sin(E_anom) - M),
+    ( if Resid < 1.0e-12 then
+        io.write_string("  [PASS] Halley cubic Kepler solver converges to machine precision (<1e-12)\n", !IO)
+      else
+        io.format("  [FAIL] Kepler solver residual: %e\n", [f(Resid)], !IO)
+    ),
+    % 3. Anomaly conversion round trip
+    Nu = mean_to_true_anomaly(M, Ecc),
+    M_rec = true_to_mean_anomaly(Nu, Ecc),
+    MErr = abs(M_rec - M),
+    ( if MErr < 1.0e-11 then
+        io.write_string("  [PASS] Mean anomaly <-> True anomaly round trip\n", !IO)
+      else
+        io.format("  [FAIL] Anomaly round trip error: %e\n", [f(MErr)], !IO)
+    ),
+    % 4. Orbital period test (500 km LEO circular orbit: a = 6878.137 km)
+    Period = orbital_period(6878137.0),
+    % Expected period = ~5677 seconds (~94.6 minutes)
+    ( if (Period > 5600.0, Period < 5750.0) then
+        io.write_string("  [PASS] LEO 500km orbital period is nominal (~94.6 min)\n", !IO)
+      else
+        io.format("  [FAIL] Unexpected orbital period: %f s\n", [f(Period)], !IO)
+    ).
 
 :- pred test_coords(io::di, io::uo) is det.
 test_coords(!IO) :-
