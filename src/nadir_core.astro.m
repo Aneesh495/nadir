@@ -6,5 +6,6 @@
 :- include_module vec3.
 :- include_module coords.
 :- include_module kepler.
+:- include_module propagator.
 
 :- implementation.

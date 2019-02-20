@@ -14,6 +14,7 @@
 :- import_module nadir_core.astro.vec3.
 :- import_module nadir_core.astro.coords.
 :- import_module nadir_core.astro.kepler.
+:- import_module nadir_core.astro.propagator.
 :- import_module float, int, list, string, math.
 
 main(!IO) :-
@@ -23,7 +24,38 @@ main(!IO) :-
     test_vec3(!IO),
     test_coords(!IO),
     test_kepler(!IO),
+    test_propagator(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_propagator(io::di, io::uo) is det.
+test_propagator(!IO) :-
+    % 1. Sun-synchronous inclination for 500km altitude
+    A_500km = 6878137.0,
+    Inc_sso = sun_synchronous_inclination(A_500km),
+    Inc_deg = rad_to_deg(Inc_sso),
+    ( if (Inc_deg > 97.0, Inc_deg < 98.0) then
+        io.write_string("  [PASS] 500km SSO analytical inclination matches theory (~97.4 deg)\n", !IO)
+      else
+        io.format("  [FAIL] Expected ~97.4 deg SSO inclination, got %f\n", [f(Inc_deg)], !IO)
+    ),
+    % 2. J2 nodal drift rate for SSO orbit matches ~0.9856 deg/day
+    KepSSO = keplerian_elements(A_500km, 0.001, Inc_sso, 0.0, 0.0, 0.0),
+    DriftRadPerSec = j2_raan_rate(KepSSO),
+    DriftDegPerDay = rad_to_deg(DriftRadPerSec) * 86400.0,
+    ( if abs(DriftDegPerDay - 0.9856) < 0.02 then
+        io.write_string("  [PASS] J2 nodal precession rate matches Earth solar rate (~0.9856 deg/day)\n", !IO)
+      else
+        io.format("  [FAIL] Expected ~0.9856 deg/day drift, got %f\n", [f(DriftDegPerDay)], !IO)
+    ),
+    % 3. Orbit track ephemeris propagation over 1 period (5400s, 60s step = 91 points)
+    Epoch0 = datetime(2026, 11, 19, 0, 0, 0.0),
+    Track = propagate_orbit_track(KepSSO, Epoch0, 60.0, 5400.0, 200),
+    TrackLen = list.length(Track),
+    ( if TrackLen = 91 then
+        io.write_string("  [PASS] Discrete orbit track generated exactly 91 ephemeris points\n", !IO)
+      else
+        io.format("  [FAIL] Expected 91 ephemeris points, got %d\n", [i(TrackLen)], !IO)
+    ).
 
 :- pred test_kepler(io::di, io::uo) is det.
 test_kepler(!IO) :-
