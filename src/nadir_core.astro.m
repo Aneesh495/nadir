@@ -7,5 +7,6 @@
 :- include_module coords.
 :- include_module kepler.
 :- include_module propagator.
+:- include_module sun.
 
 :- implementation.

@@ -41,12 +41,12 @@
 :- import_module math, list.
 :- import_module nadir_core.astro.constants.
 
-eci_to_ecef(R_eci, Gmst) = mat3_mul_vec(mat3_rot_z(Gmst), R_eci).
+eci_to_ecef(R_eci, Gmst) = mat3_mul_vec(mat3_rot_z(-Gmst), R_eci).
 
-ecef_to_eci(R_ecef, Gmst) = mat3_mul_vec(mat3_rot_z(-Gmst), R_ecef).
+ecef_to_eci(R_ecef, Gmst) = mat3_mul_vec(mat3_rot_z(Gmst), R_ecef).
 
 eci_to_ecef_vel(R_eci, V_eci, Gmst) = V_ecef :-
-    Rz = mat3_rot_z(Gmst),
+    Rz = mat3_rot_z(-Gmst),
     R_ecef = mat3_mul_vec(Rz, R_eci),
     V_rot = mat3_mul_vec(Rz, V_eci),
     % Corotational velocity: v_ecef = Rz * v_eci - omega x r_ecef
@@ -55,7 +55,7 @@ eci_to_ecef_vel(R_eci, V_eci, Gmst) = V_ecef :-
     V_ecef = vec3_sub(V_rot, V_cross).
 
 ecef_to_eci_vel(R_ecef, V_ecef, Gmst) = V_eci :-
-    Rz_inv = mat3_rot_z(-Gmst),
+    Rz_inv = mat3_rot_z(Gmst),
     Omega_vec = vec3(0.0, 0.0, earth_omega),
     V_corot = vec3_add(V_ecef, vec3_cross(Omega_vec, R_ecef)),
     V_eci = mat3_mul_vec(Rz_inv, V_corot).

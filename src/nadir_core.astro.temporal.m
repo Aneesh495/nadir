@@ -102,18 +102,21 @@ add_seconds(DT, Secs) = Res :-
 
 diff_seconds(DT2, DT1) = (datetime_to_jd(DT2) - datetime_to_jd(DT1)) * 86400.0.
 
-% Greenwich Mean Sidereal Time (IAU-82 model)
+% Greenwich Mean Sidereal Time (IAU-82 / Astronomical Almanac continuous model)
 jd_to_gmst(JD) = GMST_rad :-
-    T = (JD - 2451545.0) / 36525.0,
-    % GMST in seconds of time at 0h UT1
-    Theta0_sec = 24110.54841 +
-                 8640184.812866 * T +
-                 0.093104 * (T * T) -
-                 6.2e-6 * (T * T * T),
-    % Add Earth rotation for the fractional day (UT1)
-    Theta0_deg = Theta0_sec / 240.0,
-    Theta0_rad = deg_to_rad(Theta0_deg),
-    GMST_rad = wrap_two_pi(Theta0_rad).
+    D = JD - 2451545.0,
+    T = D / 36525.0,
+    Gmst_deg0 = 280.46061837 +
+                360.98564736629 * D +
+                0.000387933 * (T * T) -
+                (T * T * T) / 38710000.0,
+    Gmst_deg = Gmst_deg0 - float(floor_to_int(Gmst_deg0 / 360.0)) * 360.0,
+    ( if Gmst_deg < 0.0 then
+        Gmst_norm = Gmst_deg + 360.0
+      else
+        Gmst_norm = Gmst_deg
+    ),
+    GMST_rad = deg_to_rad(Gmst_norm).
 
 datetime_to_gmst(DT) = jd_to_gmst(datetime_to_jd(DT)).
 

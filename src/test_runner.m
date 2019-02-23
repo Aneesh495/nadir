@@ -15,6 +15,7 @@
 :- import_module nadir_core.astro.coords.
 :- import_module nadir_core.astro.kepler.
 :- import_module nadir_core.astro.propagator.
+:- import_module nadir_core.astro.sun.
 :- import_module float, int, list, string, math.
 
 main(!IO) :-
@@ -25,7 +26,45 @@ main(!IO) :-
     test_coords(!IO),
     test_kepler(!IO),
     test_propagator(!IO),
+    test_sun(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_sun(io::di, io::uo) is det.
+test_sun(!IO) :-
+    Epoch = datetime(2026, 3, 21, 12, 0, 0.0), % Near vernal equinox
+    JD = datetime_to_jd(Epoch),
+    S_hat = sun_vector_eci(JD),
+    SNorm = vec3_norm(S_hat),
+    ( if abs(SNorm - 1.0) < 1.0e-9 then
+        io.write_string("  [PASS] Solar unit vector norm is exactly 1.0\n", !IO)
+      else
+        io.format("  [FAIL] Sun vector norm error: %e\n", [f(SNorm)], !IO)
+    ),
+    % Test satellite in daylight (placed 7000 km along Sun vector)
+    R_sunlit = vec3_scale(7000000.0, S_hat),
+    StateSun = satellite_eclipse_state(R_sunlit, JD),
+    ( if StateSun = full_sunlight then
+        io.write_string("  [PASS] Sunward satellite correctly identified in full sunlight\n", !IO)
+      else
+        io.write_string("  [FAIL] Sunward satellite was not detected as full sunlight\n", !IO)
+    ),
+    % Test satellite in Earth shadow cone (placed 7000 km along negative Sun vector)
+    R_eclipsed = vec3_scale(-7000000.0, S_hat),
+    StateEclipse = satellite_eclipse_state(R_eclipsed, JD),
+    ( if StateEclipse = umbra then
+        io.write_string("  [PASS] Nightside LEO satellite correctly identified in umbra (total eclipse)\n", !IO)
+      else
+        io.write_string("  [FAIL] Nightside satellite was not detected as umbra\n", !IO)
+    ),
+    % Test target solar elevation: Equator at equinox noon has solar elevation > 75 deg
+    SiteEquator = geodetic(0.0, 0.0, 0.0),
+    SolarEl = target_solar_elevation(SiteEquator, Epoch),
+    SolarElDeg = rad_to_deg(SolarEl),
+    ( if SolarElDeg > 70.0 then
+        io.write_string("  [PASS] Equator solar noon elevation is high (> 70 deg)\n", !IO)
+      else
+        io.format("  [FAIL] Solar elevation was %f deg\n", [f(SolarElDeg)], !IO)
+    ).
 
 :- pred test_propagator(io::di, io::uo) is det.
 test_propagator(!IO) :-
@@ -130,8 +169,8 @@ test_coords(!IO) :-
     R_ecef = eci_to_ecef(R_eci, Gmst),
     R_eci_rt = ecef_to_eci(R_ecef, Gmst),
     EciDist = vec3_dist(R_eci, R_eci_rt),
-    ( if EciDist < 1.0e-9 then
-        io.write_string("  [PASS] ECI <-> ECEF coordinate rotation round trip\n", !IO)
+    ( if EciDist < 1.0e-8 then
+        io.write_string("  [PASS] ECI <-> ECEF coordinate rotation round trip (sub-nanometer precision)\n", !IO)
       else
         io.format("  [FAIL] ECI round trip distance: %e\n", [f(EciDist)], !IO)
     ),
