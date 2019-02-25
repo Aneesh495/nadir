@@ -16,6 +16,7 @@
 :- import_module nadir_core.astro.kepler.
 :- import_module nadir_core.astro.propagator.
 :- import_module nadir_core.astro.sun.
+:- import_module nadir_core.astro.cowell.
 :- import_module float, int, list, string, math.
 
 main(!IO) :-
@@ -27,7 +28,33 @@ main(!IO) :-
     test_kepler(!IO),
     test_propagator(!IO),
     test_sun(!IO),
+    test_cowell(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_cowell(io::di, io::uo) is det.
+test_cowell(!IO) :-
+    Props = default_earth_observation_spacecraft,
+    Kep0 = keplerian_elements(6878137.0, 0.001, deg_to_rad(97.4), 0.0, 0.0, 0.0),
+    State0 = kepler_to_rv(Kep0),
+    R0_mag = vec3_norm(State0 ^ os_pos),
+    % Numerically propagate for 600 seconds (10 minute span) with 10 second RK4 steps
+    StateCowell = propagate_cowell(Props, State0, 2461121.0, 600.0, 10.0),
+    RCowell_mag = vec3_norm(StateCowell ^ os_pos),
+    RadiusDriftRatio = abs(RCowell_mag - R0_mag) / R0_mag,
+    ( if RadiusDriftRatio < 1.0e-3 then
+        io.write_string("  [PASS] RK4 numerical integrator energy conservation (< 0.1% radius drift)\n", !IO)
+      else
+        io.format("  [FAIL] RK4 radius drift: %e\n", [f(RadiusDriftRatio)], !IO)
+    ),
+    % Compare Cowell numerical state against analytical J2 state at 600s
+    % Short-period osculating fluctuations in LEO are typically 1 - 3 km
+    StateJ2 = propagate_j2_state(Kep0, 600.0),
+    PosDiff = vec3_dist(StateCowell ^ os_pos, StateJ2 ^ os_pos),
+    ( if PosDiff < 3000.0 then
+        io.write_string("  [PASS] Numerical Cowell matches secular J2 within short-period bounds (<3km over 10 min)\n", !IO)
+      else
+        io.format("  [FAIL] Pos diff between numerical and analytical was %f m\n", [f(PosDiff)], !IO)
+    ).
 
 :- pred test_sun(io::di, io::uo) is det.
 test_sun(!IO) :-

@@ -149,8 +149,6 @@ target_solar_elevation(SiteGeo, Epoch) = Elevation :-
     S_eci = sun_vector_eci(JD),
     Gmst = datetime_to_gmst(Epoch),
     S_ecef = eci_to_ecef(S_eci, Gmst),
-    % Create target site ECEF coordinate
-    SiteEcef = geodetic_to_ecef(SiteGeo),
     % Calculate Topocentric solar vector
     % For an infinite distance source, range vector is parallel to S_ecef
     Lat = SiteGeo ^ geo_lat,

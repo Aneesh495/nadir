@@ -8,5 +8,6 @@
 :- include_module kepler.
 :- include_module propagator.
 :- include_module sun.
+:- include_module cowell.
 
 :- implementation.
