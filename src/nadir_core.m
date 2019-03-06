@@ -2,5 +2,6 @@
 :- interface.
 
 :- include_module astro.
+:- include_module access.
 
 :- implementation.
