@@ -17,7 +17,11 @@
 :- import_module nadir_core.astro.propagator.
 :- import_module nadir_core.astro.sun.
 :- import_module nadir_core.astro.cowell.
-:- import_module float, int, list, string, math.
+:- use_module nadir_core.access.
+:- import_module nadir_core.access.footprint.
+:- import_module nadir_core.access.target.
+:- import_module nadir_core.access.occultation.
+:- import_module float, int, list, string, math, bool.
 
 main(!IO) :-
     io.write_string("=== Running NADIR Astrodynamics Test Suite ===\n", !IO),
@@ -29,7 +33,53 @@ main(!IO) :-
     test_propagator(!IO),
     test_sun(!IO),
     test_cowell(!IO),
+    test_access(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_access(io::di, io::uo) is det.
+test_access(!IO) :-
+    % 1. Sensor footprint at 500km altitude
+    Sensor = default_high_res_optical_sensor,
+    SatEcef500 = vec3(earth_radius_equatorial + 500000.0, 0.0, 0.0),
+    FP = compute_footprint(Sensor, SatEcef500),
+    SwathKm = FP ^ fp_swath_width / 1000.0,
+    ( if (SwathKm > 12.0, SwathKm < 14.0) then
+        io.write_string("  [PASS] Push-broom swath width nominal at 500km altitude (~13.1 km)\n", !IO)
+      else
+        io.format("  [FAIL] Unexpected swath width: %f km\n", [f(SwathKm)], !IO)
+    ),
+    AccessWidthKm = FP ^ fp_access_width / 1000.0,
+    ( if AccessWidthKm > 500.0 then
+        io.write_string("  [PASS] Agile field-of-regard access width > 500km for +/-30 deg slew\n", !IO)
+      else
+        io.format("  [FAIL] Access width was %f km\n", [f(AccessWidthKm)], !IO)
+    ),
+    % 2. Direct overhead target access evaluation
+    Tgt = observation_target("T01", "Amazon Basin", geodetic(0.0, 0.0, 0.0), 1,
+                             deg_to_rad(20.0), deg_to_rad(30.0), deg_to_rad(10.0)),
+    SampleOverhead = evaluate_target_access(Tgt, SatEcef500, datetime(2026, 3, 21, 12, 0, 0.0), 0.0),
+    ( if SampleOverhead ^ tas_is_visible = yes then
+        io.write_string("  [PASS] Direct overhead target evaluated as visible\n", !IO)
+      else
+        io.write_string("  [FAIL] Direct overhead target was not evaluated as visible\n", !IO)
+    ),
+    % 3. Inter-satellite link line-of-sight occultation
+    Sat1 = vec3(7000000.0, 0.0, 0.0),
+    SatOpposite = vec3(-7000000.0, 0.0, 0.0),
+    StatusOpposite = check_line_of_sight(Sat1, SatOpposite, 40000.0),
+    ( if StatusOpposite = los_occulted(_) then
+        io.write_string("  [PASS] Anti-podal satellites correctly identified as Earth-occulted\n", !IO)
+      else
+        io.write_string("  [FAIL] Anti-podal satellites were not detected as occulted\n", !IO)
+    ),
+    % Adjacent satellite at 30 degree separation in orbit
+    SatAdjacent = vec3(7000000.0 * cos(deg_to_rad(30.0)), 7000000.0 * sin(deg_to_rad(30.0)), 0.0),
+    StatusAdjacent = check_line_of_sight(Sat1, SatAdjacent, 40000.0),
+    ( if StatusAdjacent = los_clear(_) then
+        io.write_string("  [PASS] Adjacent in-plane constellation satellites have clear optical LOS\n", !IO)
+      else
+        io.write_string("  [FAIL] Adjacent satellites were not detected as clear LOS\n", !IO)
+    ).
 
 :- pred test_cowell(io::di, io::uo) is det.
 test_cowell(!IO) :-
