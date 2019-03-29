@@ -21,6 +21,11 @@
 :- import_module nadir_core.access.footprint.
 :- import_module nadir_core.access.target.
 :- import_module nadir_core.access.occultation.
+:- use_module nadir_core.platform.
+:- import_module nadir_core.platform.quaternion.
+:- import_module nadir_core.platform.slew.
+:- import_module nadir_core.platform.power.
+:- import_module nadir_core.platform.storage.
 :- import_module float, int, list, string, math, bool.
 
 main(!IO) :-
@@ -34,7 +39,59 @@ main(!IO) :-
     test_sun(!IO),
     test_cowell(!IO),
     test_access(!IO),
+    test_platform(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_platform(io::di, io::uo) is det.
+test_platform(!IO) :-
+    % 1. Quaternion rotation around Z axis by 90 deg
+    Q_rot = quat_from_axis_angle(vec3_unit_z, half_pi),
+    V_init = vec3_unit_x,
+    V_rot = quat_rot_vec(Q_rot, V_init),
+    V_err = vec3_dist(V_rot, vec3_unit_y),
+    ( if V_err < 1.0e-12 then
+        io.write_string("  [PASS] Quaternion vector rotation maps unit_x to unit_y\n", !IO)
+      else
+        io.format("  [FAIL] Quaternion vector rotation error: %e\n", [f(V_err)], !IO)
+    ),
+    % 2. Quaternion SLERP interpolation
+    Q_0 = quat_identity,
+    Q_half = quat_slerp(Q_0, Q_rot, 0.5),
+    AngleHalf = quat_angle_between(Q_0, Q_half),
+    ( if abs(AngleHalf - (half_pi * 0.5)) < 1.0e-12 then
+        io.write_string("  [PASS] SLERP 50% interpolation yields exact midpoint attitude\n", !IO)
+      else
+        io.format("  [FAIL] SLERP angle error: %e\n", [f(abs(AngleHalf - (half_pi * 0.5)))], !IO)
+    ),
+    % 3. Agile slew duration
+    ADCS = default_agile_adcs,
+    SlewProf = compute_slew_profile(ADCS, deg_to_rad(30.0)),
+    Dur = SlewProf ^ sp_total_duration,
+    ( if (Dur > 10.0, Dur < 16.0) then
+        io.write_string("  [PASS] 30 degree agile slew duration is nominal (~13s)\n", !IO)
+      else
+        io.format("  [FAIL] Unexpected slew duration: %f s\n", [f(Dur)], !IO)
+    ),
+    % 4. Power EPS battery discharge step
+    PowerSpecs = default_power_specs,
+    Pwr0 = initial_power_state,
+    % 1000 seconds of eclipse (0.0 solar flux) with payload active (175W)
+    Pwr1 = step_power_state(PowerSpecs, Pwr0, 0.0, yes, no, no, 1000.0),
+    ( if (Pwr1 ^ ps_soc < 1.0, Pwr1 ^ ps_soc > 0.8) then
+        io.write_string("  [PASS] EPS battery discharges monotonically during eclipse operations\n", !IO)
+      else
+        io.format("  [FAIL] Battery SoC out of bounds: %f\n", [f(Pwr1 ^ ps_soc)], !IO)
+    ),
+    % 5. Storage SSR buffer step
+    StorageSpecs = default_storage_specs,
+    Stor0 = initial_storage_state,
+    % 10 seconds of imaging at 2.4 Gbps = 24 Gb
+    Stor1 = step_storage_state(StorageSpecs, Stor0, yes, yes, no, 10.0),
+    ( if abs(Stor1 ^ ss_used_gigabits - 24.0) < 1.0e-6 then
+        io.write_string("  [PASS] Storage SSR ingests exact payload volume (24.0 Gb)\n", !IO)
+      else
+        io.format("  [FAIL] Storage used: %f Gb\n", [f(Stor1 ^ ss_used_gigabits)], !IO)
+    ).
 
 :- pred test_access(io::di, io::uo) is det.
 test_access(!IO) :-
