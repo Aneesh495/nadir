@@ -26,6 +26,10 @@
 :- import_module nadir_core.platform.slew.
 :- import_module nadir_core.platform.power.
 :- import_module nadir_core.platform.storage.
+:- use_module nadir_core.scheduler.
+:- import_module nadir_core.scheduler.types.
+:- import_module nadir_core.scheduler.constraints.
+:- import_module nadir_core.scheduler.optimizer.
 :- import_module float, int, list, string, math, bool.
 
 main(!IO) :-
@@ -40,7 +44,49 @@ main(!IO) :-
     test_cowell(!IO),
     test_access(!IO),
     test_platform(!IO),
+    test_scheduler(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_scheduler(io::di, io::uo) is det.
+test_scheduler(!IO) :-
+    ADCS = default_agile_adcs,
+    PowerSpecs = default_power_specs,
+    StorageSpecs = default_storage_specs,
+    % 1. Slew feasibility check: 30s available for 10 deg slew (req ~8s) -> yes
+    FeasYes = is_slew_feasible(ADCS, 0.0, 100.0, deg_to_rad(10.0), 130.0),
+    ( if FeasYes = yes then
+        io.write_string("  [PASS] Slew feasibility predicate accepts sufficient interval\n", !IO)
+      else
+        io.write_string("  [FAIL] Slew feasibility rejected valid interval\n", !IO)
+    ),
+    % 3s available for 45 deg slew (req ~15s) -> no
+    FeasNo = is_slew_feasible(ADCS, 0.0, 100.0, deg_to_rad(45.0), 103.0),
+    ( if FeasNo = no then
+        io.write_string("  [PASS] Slew feasibility predicate rejects insufficient interval\n", !IO)
+      else
+        io.write_string("  [FAIL] Slew feasibility accepted invalid interval\n", !IO)
+    ),
+    % 2. Full constellation mission scheduling solver
+    T1 = task_request("REQ_01", "TGT_SYDNEY", 0, 15.0, 100.0, datetime(2026, 3, 21, 14, 0, 0.0)),
+    T2 = task_request("REQ_02", "TGT_TOKYO", 1, 15.0, 50.0, datetime(2026, 3, 21, 15, 0, 0.0)),
+    Requests = [T1, T2],
+    Epoch0 = datetime(2026, 3, 21, 12, 0, 0.0),
+    Win1 = target_access_window("TGT_SYDNEY", "SAT_01", Epoch0, 200.0, Epoch0, 300.0, 100.0, deg_to_rad(45.0), deg_to_rad(10.0), deg_to_rad(30.0)),
+    Win2 = target_access_window("TGT_TOKYO", "SAT_01", Epoch0, 1200.0, Epoch0, 1300.0, 100.0, deg_to_rad(60.0), deg_to_rad(5.0), deg_to_rad(45.0)),
+    Windows = [Win1, Win2],
+    Schedule = solve_constellation_schedule(ADCS, PowerSpecs, StorageSpecs, Requests, Windows),
+    ( if Schedule ^ cs_fulfilled_count = 2 then
+        io.write_string("  [PASS] Constellation constraint solver fulfilled 100% of candidate tasks\n", !IO)
+      else
+        io.format("  [FAIL] Fulfilled tasks count: %d\n", [i(Schedule ^ cs_fulfilled_count)], !IO)
+    ),
+    % Verify scheduled satellite timeline
+    TimelineValid = verify_satellite_timeline(ADCS, Schedule ^ cs_observations),
+    ( if TimelineValid = yes then
+        io.write_string("  [PASS] Generated observation schedule satisfies all ADCS agility constraints\n", !IO)
+      else
+        io.write_string("  [FAIL] Scheduled timeline violated agility constraints\n", !IO)
+    ).
 
 :- pred test_platform(io::di, io::uo) is det.
 test_platform(!IO) :-
