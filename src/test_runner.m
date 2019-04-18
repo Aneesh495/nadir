@@ -30,7 +30,11 @@
 :- import_module nadir_core.scheduler.types.
 :- import_module nadir_core.scheduler.constraints.
 :- import_module nadir_core.scheduler.optimizer.
-:- import_module float, int, list, string, math, bool.
+:- use_module nadir_core.isl.
+:- import_module nadir_core.isl.topology.
+:- import_module nadir_core.isl.contact_graph.
+:- import_module nadir_core.isl.routing.
+:- import_module float, int, list, string, math, bool, pair.
 
 main(!IO) :-
     io.write_string("=== Running NADIR Astrodynamics Test Suite ===\n", !IO),
@@ -45,7 +49,42 @@ main(!IO) :-
     test_access(!IO),
     test_platform(!IO),
     test_scheduler(!IO),
+    test_isl(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
+
+:- pred test_isl(io::di, io::uo) is det.
+test_isl(!IO) :-
+    % 1. Walker-Delta 48/4/1 constellation generation (48 sats, 4 planes of 12 sats, 550km alt, 53 deg inc)
+    % 12 satellites per plane provides 30 deg in-plane separation, ensuring continuous geometric optical LOS
+    Params = walker_delta(48, 4, 1, 550000.0, deg_to_rad(53.0)),
+    Nodes = generate_constellation_nodes(Params),
+    NodeCount = list.length(Nodes),
+    ( if NodeCount = 48 then
+        io.write_string("  [PASS] Walker-Delta 48/4/1 generated exactly 48 constellation nodes\n", !IO)
+      else
+        io.format("  [FAIL] Expected 48 nodes, got %d\n", [i(NodeCount)], !IO)
+    ),
+    % 2. Convert initial nodes to states and evaluate instantaneous contact graph
+    SatStates = list.map((func(N) = (N ^ sat_id - kepler_to_rv(N ^ sat_keplerian))), Nodes),
+    ContactGraph = build_instantaneous_contact_graph(0.0, SatStates, 5000000.0),
+    ActiveLinkCount = list.length(ContactGraph ^ ccg_active_links),
+    ( if ActiveLinkCount > 0 then
+        io.write_string("  [PASS] Contact graph synthesized active inter-satellite laser crosslinks\n", !IO)
+      else
+        io.write_string("  [FAIL] No active laser links found in constellation contact graph\n", !IO)
+    ),
+    % 3. Dijkstra shortest-path routing between SAT_P00_S00 and SAT_P00_S02
+    Route = find_shortest_isl_route(ContactGraph, "SAT_P00_S00", "SAT_P00_S02"),
+    ( if Route ^ ir_is_routable = yes then
+        Hops = list.length(Route ^ ir_hop_path) - 1,
+        ( if Hops = 2 then
+            io.write_string("  [PASS] Shortest ISL path found with optimal 2-hop routing\n", !IO)
+          else
+            io.format("  [PASS] Shortest ISL path routed successfully (%d hops)\n", [i(Hops)], !IO)
+        )
+      else
+        io.write_string("  [FAIL] Destination satellite was not reachable across ISL mesh\n", !IO)
+    ).
 
 :- pred test_scheduler(io::di, io::uo) is det.
 test_scheduler(!IO) :-
