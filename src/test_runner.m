@@ -34,6 +34,10 @@
 :- import_module nadir_core.isl.topology.
 :- import_module nadir_core.isl.contact_graph.
 :- import_module nadir_core.isl.routing.
+:- use_module nadir_core.ground.
+:- import_module nadir_core.ground.stations.
+:- import_module nadir_core.ground.passes.
+:- import_module nadir_core.ground.downlink.
 :- import_module float, int, list, string, math, bool, pair.
 
 main(!IO) :-
@@ -50,6 +54,7 @@ main(!IO) :-
     test_platform(!IO),
     test_scheduler(!IO),
     test_isl(!IO),
+    test_ground(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -480,4 +485,45 @@ test_temporal(!IO) :-
         io.write_string("  [PASS] Epoch difference returns accurate second delta\n", !IO)
       else
         io.format("  [FAIL] Expected 86400.0, got %f\n", [f(DiffSec)], !IO)
+    ).
+
+:- pred test_ground(io::di, io::uo) is det.
+test_ground(!IO) :-
+    Network = standard_polar_and_equatorial_network,
+    ( if list.length(Network) = 5 then
+        io.write_string("  [PASS] Global ground station catalog initialized (5 sites)\n", !IO)
+      else
+        io.write_string("  [FAIL] Ground station network size mismatch\n", !IO)
+    ),
+    Epoch0 = datetime(2026, 6, 21, 12, 0, 0.0),
+    Gmst0 = datetime_to_gmst(Epoch0),
+    Svalbard = station_svalbard,
+    SvalLon = Svalbard ^ gs_geo ^ geo_lon,
+    SvalLat = Svalbard ^ gs_geo ^ geo_lat,
+    Raan = wrap_two_pi(math.pi - SvalLon - Gmst0),
+    Nu0 = math.pi + SvalLat - deg_to_rad(6.0),
+    A = wgs84_a + 500000.0,
+    Inc = deg_to_rad(90.0),
+    Kep = keplerian_elements(A, 0.0001, Inc, Raan, 0.0, Nu0),
+    Track = propagate_orbit_track(Kep, Epoch0, 10.0, 900.0, 100),
+    Passes = compute_ground_passes("SAT_POLAR_01", Svalbard, Track),
+    ( if Passes = [FirstPass | _] then
+        MaxElDeg = rad_to_deg(FirstPass ^ gp_max_elevation),
+        CapGb = FirstPass ^ gp_data_capacity_gb,
+        ( if (MaxElDeg > 20.0, CapGb > 10.0) then
+            io.write_string("  [PASS] Svalbard polar ground pass detected with high elevation and capacity\n", !IO)
+          else
+            io.format("  [FAIL] Ground pass values out of range: MaxEl=%f, Cap=%f\n", [f(MaxElDeg), f(CapGb)], !IO)
+        )
+      else
+        io.write_string("  [FAIL] No ground pass detected over Svalbard\n", !IO)
+    ),
+    PassA = ground_pass("GS_SVALBARD", "SAT_01", Epoch0, 100.0, Epoch0, 600.0, 500.0, 0.8, 120.0),
+    PassB = ground_pass("GS_SVALBARD", "SAT_02", Epoch0, 150.0, Epoch0, 650.0, 500.0, 0.7, 95.0),
+    PassC = ground_pass("GS_SVALBARD", "SAT_03", Epoch0, 200.0, Epoch0, 700.0, 500.0, 0.9, 140.0),
+    Plan = allocate_downlink_contacts(Network, [PassA, PassB, PassC]),
+    ( if (Plan ^ dp_passes_utilized = 3, Plan ^ dp_total_dumped_gb > 350.0) then
+        io.write_string("  [PASS] Multi-satellite ground antenna contention allocated across dishes\n", !IO)
+      else
+        io.write_string("  [FAIL] Downlink allocation failed\n", !IO)
     ).
