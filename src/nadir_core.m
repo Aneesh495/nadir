@@ -7,5 +7,6 @@
 :- include_module scheduler.
 :- include_module isl.
 :- include_module ground.
+:- include_module io_tle.
 
 :- implementation.

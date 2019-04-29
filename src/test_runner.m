@@ -38,7 +38,8 @@
 :- import_module nadir_core.ground.stations.
 :- import_module nadir_core.ground.passes.
 :- import_module nadir_core.ground.downlink.
-:- import_module float, int, list, string, math, bool, pair.
+:- import_module nadir_core.io_tle.
+:- import_module float, int, list, string, math, bool, pair, maybe.
 
 main(!IO) :-
     io.write_string("=== Running NADIR Astrodynamics Test Suite ===\n", !IO),
@@ -55,6 +56,7 @@ main(!IO) :-
     test_scheduler(!IO),
     test_isl(!IO),
     test_ground(!IO),
+    test_io_tle(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -526,4 +528,38 @@ test_ground(!IO) :-
         io.write_string("  [PASS] Multi-satellite ground antenna contention allocated across dishes\n", !IO)
       else
         io.write_string("  [FAIL] Downlink allocation failed\n", !IO)
+    ).
+
+:- pred test_io_tle(io::di, io::uo) is det.
+test_io_tle(!IO) :-
+    % Standard Sentinel-2A Earth Observation satellite TLE
+    Line1 = "1 40697U 15028A   26050.50000000  .00000120  00000-0  18450-4 0  9991",
+    Line2 = "2 40697  98.5700 120.4500 0001200  85.2000 274.9500 14.30820000554321",
+    ParseRes = parse_tle("SENTINEL-2A", Line1, Line2),
+    ( if ParseRes = yes(Tle) then
+        ( if (Tle ^ tle_sat_number = 40697,
+              Tle ^ tle_epoch_year = 2026,
+              abs(Tle ^ tle_inclination_deg - 98.57) < 1.0e-3,
+              abs(Tle ^ tle_eccentricity - 0.00012) < 1.0e-6) then
+            io.write_string("  [PASS] NORAD TLE parser extracted orbital telemetry correctly\n", !IO)
+          else
+            io.write_string("  [FAIL] TLE field mismatch\n", !IO)
+        ),
+        % Convert to Keplerian state
+        Kep = tle_to_keplerian(Tle),
+        SemiMajorKm = Kep ^ kep_a / 1000.0,
+        ( if (SemiMajorKm > 7150.0, SemiMajorKm < 7250.0) then
+            io.write_string("  [PASS] TLE mean motion mapped to expected 786km orbit semi-major axis\n", !IO)
+          else
+            io.format("  [FAIL] Unexpected semi-major axis from TLE: %f km\n", [f(SemiMajorKm)], !IO)
+        ),
+        % Convert epoch day 50.5 (Feb 19 12:00:00)
+        Dt = tle_epoch_to_datetime(Tle ^ tle_epoch_year, Tle ^ tle_epoch_day),
+        ( if (Dt ^ dt_year = 2026, Dt ^ dt_month = 2, Dt ^ dt_day = 19, Dt ^ dt_hour = 12) then
+            io.write_string("  [PASS] TLE epoch fractional day converted to UTC calendar datetime\n", !IO)
+          else
+            io.format("  [FAIL] TLE epoch datetime mismatch: %s\n", [s(format_iso8601(Dt))], !IO)
+        )
+      else
+        io.write_string("  [FAIL] Failed to parse TLE\n", !IO)
     ).
