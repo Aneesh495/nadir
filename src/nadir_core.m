@@ -8,5 +8,6 @@
 :- include_module isl.
 :- include_module ground.
 :- include_module io_tle.
+:- include_module io_target.
 
 :- implementation.

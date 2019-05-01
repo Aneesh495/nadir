@@ -39,6 +39,7 @@
 :- import_module nadir_core.ground.passes.
 :- import_module nadir_core.ground.downlink.
 :- import_module nadir_core.io_tle.
+:- import_module nadir_core.io_target.
 :- import_module float, int, list, string, math, bool, pair, maybe.
 
 main(!IO) :-
@@ -57,6 +58,7 @@ main(!IO) :-
     test_isl(!IO),
     test_ground(!IO),
     test_io_tle(!IO),
+    test_io_target(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -562,4 +564,25 @@ test_io_tle(!IO) :-
         )
       else
         io.write_string("  [FAIL] Failed to parse TLE\n", !IO)
+    ).
+
+:- pred test_io_target(io::di, io::uo) is det.
+test_io_target(!IO) :-
+    TargetCsv = "# Observation Targets Catalog\n" ++
+                "T01,Suez Canal Maritime,30.5852,32.2654,10.0,0,20.0,30.0,15.0\n" ++
+                "T02,Amazon Rainforest Deforestation,-3.4653,-62.2159,80.0,1,15.0,35.0,10.0\n",
+    Targets = parse_target_catalog(TargetCsv),
+    ( if list.length(Targets) = 2 then
+        io.write_string("  [PASS] Target catalog CSV parsed 2 targets skipping comments\n", !IO)
+      else
+        io.format("  [FAIL] Target catalog parsed %d targets\n", [i(list.length(Targets))], !IO)
+    ),
+    TaskCsv = "# Task Requests Catalog\n" ++
+              "REQ_001,T01,0,15.0,95.0,2026-06-21T18:00:00Z\n" ++
+              "REQ_002,T02,1,20.0,70.0,2026-06-21T21:30:00Z\n",
+    Tasks = parse_task_catalog(TaskCsv),
+    ( if list.length(Tasks) = 2 then
+        io.write_string("  [PASS] Task requests CSV parsed with ISO-8601 deadlines\n", !IO)
+      else
+        io.format("  [FAIL] Task catalog parsed %d tasks\n", [i(list.length(Tasks))], !IO)
     ).
