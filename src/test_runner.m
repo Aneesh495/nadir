@@ -40,6 +40,7 @@
 :- import_module nadir_core.ground.downlink.
 :- import_module nadir_core.io_tle.
 :- import_module nadir_core.io_target.
+:- import_module nadir_core.io_czml.
 :- import_module float, int, list, string, math, bool, pair, maybe.
 
 main(!IO) :-
@@ -59,6 +60,7 @@ main(!IO) :-
     test_ground(!IO),
     test_io_tle(!IO),
     test_io_target(!IO),
+    test_io_czml(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -585,4 +587,27 @@ test_io_target(!IO) :-
         io.write_string("  [PASS] Task requests CSV parsed with ISO-8601 deadlines\n", !IO)
       else
         io.format("  [FAIL] Task catalog parsed %d tasks\n", [i(list.length(Tasks))], !IO)
+    ).
+
+:- pred test_io_czml(io::di, io::uo) is det.
+test_io_czml(!IO) :-
+    Epoch0 = datetime(2026, 6, 21, 12, 0, 0.0),
+    Kep = keplerian_elements(wgs84_a + 500000.0, 0.001, deg_to_rad(53.0), 0.0, 0.0, 0.0),
+    Track = propagate_orbit_track(Kep, Epoch0, 60.0, 300.0, 10),
+    SatTracks = ["SAT_ALPHA" - Track],
+    EpochEnd = add_seconds(Epoch0, 300.0),
+    Czml = export_constellation_czml("Test Constellation", Epoch0, EpochEnd, SatTracks),
+    ( if (string.sub_string_search(Czml, "\"id\": \"document\"", _),
+          string.sub_string_search(Czml, "\"id\": \"SAT_ALPHA\"", _),
+          string.sub_string_search(Czml, "\"interpolationAlgorithm\": \"LAGRANGE\"", _)) then
+        io.write_string("  [PASS] Cesium CZML orbital document exported with Lagrange ephemeris\n", !IO)
+      else
+        io.write_string("  [FAIL] CZML document export failed\n", !IO)
+    ),
+    IslPacket = export_isl_link_czml("LINK_01", "SAT_01", "SAT_02", Epoch0, 0.0, 120.0),
+    ( if (string.sub_string_search(IslPacket, "\"id\": \"ISL_LINK_01\"", _),
+          string.sub_string_search(IslPacket, "\"references\": [\"SAT_01#position\", \"SAT_02#position\"]", _)) then
+        io.write_string("  [PASS] Cesium CZML inter-satellite laser crosslink exported with dynamic polyline\n", !IO)
+      else
+        io.write_string("  [FAIL] CZML ISL export failed\n", !IO)
     ).

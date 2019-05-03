@@ -9,5 +9,6 @@
 :- include_module ground.
 :- include_module io_tle.
 :- include_module io_target.
+:- include_module io_czml.
 
 :- implementation.
