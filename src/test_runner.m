@@ -41,6 +41,7 @@
 :- import_module nadir_core.io_tle.
 :- import_module nadir_core.io_target.
 :- import_module nadir_core.io_czml.
+:- import_module nadir_core.io_geojson.
 :- import_module float, int, list, string, math, bool, pair, maybe.
 
 main(!IO) :-
@@ -61,6 +62,7 @@ main(!IO) :-
     test_io_tle(!IO),
     test_io_target(!IO),
     test_io_czml(!IO),
+    test_io_geojson(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -610,4 +612,26 @@ test_io_czml(!IO) :-
         io.write_string("  [PASS] Cesium CZML inter-satellite laser crosslink exported with dynamic polyline\n", !IO)
       else
         io.write_string("  [FAIL] CZML ISL export failed\n", !IO)
+    ).
+
+:- pred test_io_geojson(io::di, io::uo) is det.
+test_io_geojson(!IO) :-
+    Epoch0 = datetime(2026, 6, 21, 12, 0, 0.0),
+    Kep = keplerian_elements(wgs84_a + 500000.0, 0.001, deg_to_rad(53.0), 0.0, 0.0, 0.0),
+    Track = propagate_orbit_track(Kep, Epoch0, 60.0, 180.0, 5),
+    GeoJson = export_ground_track_geojson("SAT_01", Track),
+    ( if (string.sub_string_search(GeoJson, "\"type\": \"LineString\"", _),
+          string.sub_string_search(GeoJson, "\"satellite_id\": \"SAT_01\"", _)) then
+        io.write_string("  [PASS] Satellite ground track exported as GeoJSON LineString\n", !IO)
+      else
+        io.write_string("  [FAIL] GeoJSON ground track export failed\n", !IO)
+    ),
+    Tgt = observation_target("T01", "Suez Canal", geodetic(deg_to_rad(30.5), deg_to_rad(32.2), 0.0),
+                             0, deg_to_rad(20.0), deg_to_rad(30.0), deg_to_rad(10.0)),
+    TgtGeoJson = export_targets_geojson([Tgt]),
+    ( if (string.sub_string_search(TgtGeoJson, "\"type\": \"FeatureCollection\"", _),
+          string.sub_string_search(TgtGeoJson, "\"target_id\": \"T01\"", _)) then
+        io.write_string("  [PASS] Targets catalog exported as GeoJSON FeatureCollection\n", !IO)
+      else
+        io.write_string("  [FAIL] GeoJSON targets export failed\n", !IO)
     ).
