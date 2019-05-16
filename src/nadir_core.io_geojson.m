@@ -22,6 +22,7 @@
 
 :- import_module float, int.
 :- import_module nadir_core.astro.constants.
+:- import_module nadir_core.astro.coords.
 
 export_ground_track_geojson(SatId, Track) = Feature :-
     CoordStrings = list.map((func(Pt) = S :-

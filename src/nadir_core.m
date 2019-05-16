@@ -11,5 +11,6 @@
 :- include_module io_target.
 :- include_module io_czml.
 :- include_module io_geojson.
+:- include_module sim.
 
 :- implementation.
