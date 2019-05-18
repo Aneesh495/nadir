@@ -132,35 +132,35 @@ format_iso8601(DT) = Str :-
 
 parse_iso8601(Str) = Result :-
     Trimmed = string.strip(Str),
-    Chars = string.to_char_list(Trimmed),
-    ( if
-        Chars = [Y1, Y2, Y3, Y4, ('-'), M1, M2, ('-'), D1, D2, ('T'), H1, H2, (':'), Min1, Min2, (':') | RestSecChars]
-      then
-        YStr = string.from_char_list([Y1, Y2, Y3, Y4]),
-        MStr = string.from_char_list([M1, M2]),
-        DStr = string.from_char_list([D1, D2]),
-        HStr = string.from_char_list([H1, H2]),
-        MinStr = string.from_char_list([Min1, Min2]),
-        SecChars = list.filter((pred(C::in) is semidet :- C \= ('Z'), C \= ('z')), RestSecChars),
-        SecStr = string.from_char_list(SecChars),
+    ( if string.split_at_char('T', Trimmed) = [DatePart, TimePart] then
         ( if
-            string.to_int(YStr, Y),
-            string.to_int(MStr, M),
-            string.to_int(DStr, D),
-            string.to_int(HStr, H),
-            string.to_int(MinStr, Min),
-            string.to_float(SecStr, SecFloat)
+            string.split_at_char('-', DatePart) = [YStr, MStr, DStr],
+            string.split_at_char(':', TimePart) = [HStr, MinStr, SecFullStr]
           then
-            Result = yes(datetime(Y, M, D, H, Min, SecFloat))
-          else if
-            string.to_int(YStr, Y),
-            string.to_int(MStr, M),
-            string.to_int(DStr, D),
-            string.to_int(HStr, H),
-            string.to_int(MinStr, Min),
-            string.to_int(SecStr, SecInt)
-          then
-            Result = yes(datetime(Y, M, D, H, Min, float(SecInt)))
+            SecChars = string.to_char_list(SecFullStr),
+            CleanSecChars = list.filter((pred(C::in) is semidet :- C \= ('Z'), C \= ('z')), SecChars),
+            SecStr = string.from_char_list(CleanSecChars),
+            ( if
+                string.to_int(YStr, Y),
+                string.to_int(MStr, M),
+                string.to_int(DStr, D),
+                string.to_int(HStr, H),
+                string.to_int(MinStr, Min),
+                string.to_float(SecStr, SecFloat)
+              then
+                Result = yes(datetime(Y, M, D, H, Min, SecFloat))
+              else if
+                string.to_int(YStr, Y),
+                string.to_int(MStr, M),
+                string.to_int(DStr, D),
+                string.to_int(HStr, H),
+                string.to_int(MinStr, Min),
+                string.to_int(SecStr, SecInt)
+              then
+                Result = yes(datetime(Y, M, D, H, Min, float(SecInt)))
+              else
+                Result = no
+            )
           else
             Result = no
         )

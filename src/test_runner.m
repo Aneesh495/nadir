@@ -42,6 +42,7 @@
 :- import_module nadir_core.io_target.
 :- import_module nadir_core.io_czml.
 :- import_module nadir_core.io_geojson.
+:- import_module nadir_core.sim.
 :- import_module float, int, list, string, math, bool, pair, maybe.
 
 main(!IO) :-
@@ -63,6 +64,7 @@ main(!IO) :-
     test_io_target(!IO),
     test_io_czml(!IO),
     test_io_geojson(!IO),
+    test_simulation(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -634,4 +636,38 @@ test_io_geojson(!IO) :-
         io.write_string("  [PASS] Targets catalog exported as GeoJSON FeatureCollection\n", !IO)
       else
         io.write_string("  [FAIL] GeoJSON targets export failed\n", !IO)
+    ).
+
+:- pred test_simulation(io::di, io::uo) is det.
+test_simulation(!IO) :-
+    Epoch0 = datetime(2026, 6, 21, 12, 0, 0.0),
+    Walker = walker_delta(4, 2, 1, 550000.0, deg_to_rad(53.0)),
+    Nodes  = generate_constellation_nodes(Walker),
+    Tgt1   = observation_target("T01", "Suez Maritime",
+                                geodetic(deg_to_rad(30.5), deg_to_rad(32.2), 0.0),
+                                0, deg_to_rad(15.0), deg_to_rad(35.0), deg_to_rad(10.0)),
+    Tgt2   = observation_target("T02", "Panama Canal",
+                                geodetic(deg_to_rad(9.1), deg_to_rad(-79.7), 0.0),
+                                1, deg_to_rad(15.0), deg_to_rad(35.0), deg_to_rad(10.0)),
+    Req1   = task_request("REQ_01", "T01", 0, 15.0, 100.0, add_seconds(Epoch0, 3600.0)),
+    Req2   = task_request("REQ_02", "T02", 1, 20.0, 75.0, add_seconds(Epoch0, 3600.0)),
+    GroundNet = standard_polar_and_equatorial_network,
+    Config = mission_config("NADIR 4-Sat Operational Run", Epoch0, 600.0, 30.0,
+                            Nodes, [Tgt1, Tgt2], [Req1, Req2], GroundNet),
+    SimResult = run_mission_simulation(Config),
+    Telem = SimResult ^ sr_telemetry,
+    ( if Telem ^ mt_total_tasks_requested = 2 then
+        io.write_string("  [PASS] Closed-loop simulation executed 4-satellite constellation timeline\n", !IO)
+      else
+        io.write_string("  [FAIL] Simulation task count mismatch\n", !IO)
+    ),
+    ( if Telem ^ mt_min_battery_soc > 0.60 then
+        io.write_string("  [PASS] Constellation battery State-of-Charge preserved above minimum reserve (>60%)\n", !IO)
+      else
+        io.format("  [FAIL] Battery SoC depleted below threshold: %f\n", [f(Telem ^ mt_min_battery_soc)], !IO)
+    ),
+    ( if Telem ^ mt_max_storage_used_gb =< 500.0 then
+        io.write_string("  [PASS] Constellation SSR storage remained within safe buffer margins\n", !IO)
+      else
+        io.write_string("  [FAIL] SSR memory overflowed buffer\n", !IO)
     ).
