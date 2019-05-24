@@ -65,6 +65,7 @@ main(!IO) :-
     test_io_czml(!IO),
     test_io_geojson(!IO),
     test_simulation(!IO),
+    test_constellation_benchmark(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -670,4 +671,41 @@ test_simulation(!IO) :-
         io.write_string("  [PASS] Constellation SSR storage remained within safe buffer margins\n", !IO)
       else
         io.write_string("  [FAIL] SSR memory overflowed buffer\n", !IO)
+    ).
+
+:- pred test_constellation_benchmark(io::di, io::uo) is det.
+test_constellation_benchmark(!IO) :-
+    Epoch0 = datetime(2026, 6, 21, 12, 0, 0.0),
+    % 12-Satellite Walker-Delta 12/3/1 constellation (550km, 53 deg inc)
+    Walker = walker_delta(12, 3, 1, 550000.0, deg_to_rad(53.0)),
+    Nodes  = generate_constellation_nodes(Walker),
+    Tgt1 = observation_target("T01", "Tokyo Port", geodetic(deg_to_rad(35.68), deg_to_rad(139.76), 10.0),
+                              0, deg_to_rad(20.0), deg_to_rad(30.0), deg_to_rad(10.0)),
+    Tgt2 = observation_target("T02", "London Heathrow", geodetic(deg_to_rad(51.50), deg_to_rad(-0.12), 25.0),
+                              1, deg_to_rad(20.0), deg_to_rad(30.0), deg_to_rad(10.0)),
+    Tgt3 = observation_target("T03", "Sydney Harbor", geodetic(deg_to_rad(-33.86), deg_to_rad(151.20), 15.0),
+                              2, deg_to_rad(20.0), deg_to_rad(30.0), deg_to_rad(10.0)),
+    Tgt4 = observation_target("T04", "New York Harbor", geodetic(deg_to_rad(40.71), deg_to_rad(-74.00), 5.0),
+                              1, deg_to_rad(20.0), deg_to_rad(30.0), deg_to_rad(10.0)),
+    Targets = [Tgt1, Tgt2, Tgt3, Tgt4],
+    Req1 = task_request("REQ_01", "T01", 0, 15.0, 100.0, add_seconds(Epoch0, 3600.0)),
+    Req2 = task_request("REQ_02", "T02", 1, 20.0, 80.0, add_seconds(Epoch0, 3600.0)),
+    Req3 = task_request("REQ_03", "T03", 2, 25.0, 50.0, add_seconds(Epoch0, 3600.0)),
+    Req4 = task_request("REQ_04", "T04", 1, 15.0, 85.0, add_seconds(Epoch0, 3600.0)),
+    Requests = [Req1, Req2, Req3, Req4],
+    GroundNet = standard_polar_and_equatorial_network,
+    Config = mission_config("Walker 12/3/1 Benchmark", Epoch0, 1800.0, 30.0,
+                            Nodes, Targets, Requests, GroundNet),
+    Result = run_mission_simulation(Config),
+    Telem = Result ^ sr_telemetry,
+    ( if Telem ^ mt_total_tasks_requested = 4 then
+        io.write_string("  [PASS] 12-Satellite constellation mission benchmark initialized 4 task requests\n", !IO)
+      else
+        io.write_string("  [FAIL] Task count mismatch in benchmark\n", !IO)
+    ),
+    Summary = format_simulation_summary(Result),
+    ( if string.sub_string_search(Summary, "Simulation 'Walker 12/3/1 Benchmark' Complete", _) then
+        io.write_string("  [PASS] Constellation simulation summary formatting verified\n", !IO)
+      else
+        io.write_string("  [FAIL] Summary formatting mismatch\n", !IO)
     ).
