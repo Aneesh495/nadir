@@ -3,7 +3,9 @@ Mercury/
 *.mh
 *.err
 *.init
-*.c
+src/*.c
+!c_src/*.c
+!c_src/*.h
 *.o
 *.pic_o
 *.a
