@@ -43,6 +43,7 @@
 :- import_module nadir_core.io_czml.
 :- import_module nadir_core.io_geojson.
 :- import_module nadir_core.sim.
+:- import_module nadir_core.c_fastpath.
 :- import_module float, int, list, string, math, bool, pair, maybe.
 
 main(!IO) :-
@@ -66,6 +67,7 @@ main(!IO) :-
     test_io_geojson(!IO),
     test_simulation(!IO),
     test_constellation_benchmark(!IO),
+    test_c_fastpath(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
@@ -708,4 +710,45 @@ test_constellation_benchmark(!IO) :-
         io.write_string("  [PASS] Constellation simulation summary formatting verified\n", !IO)
       else
         io.write_string("  [FAIL] Summary formatting mismatch\n", !IO)
+    ).
+
+:- pred test_c_fastpath(io::di, io::uo) is det.
+test_c_fastpath(!IO) :-
+    % 1. Dot product test
+    DotPure = vec3_dot(vec3(1.0, 2.0, 3.0), vec3(4.0, 5.0, 6.0)),
+    DotFast = fast_dot3(1.0, 2.0, 3.0, 4.0, 5.0, 6.0),
+    ( if abs(DotPure - DotFast) < 1.0e-12 then
+        io.write_string("  [PASS] C FFI vector dot fastpath matches pure Mercury (sub-picometer exact)\n", !IO)
+      else
+        io.format("  [FAIL] Dot fastpath error: pure=%f, fast=%f\n", [f(DotPure), f(DotFast)], !IO)
+    ),
+    % 2. Cross product test
+    CrossPure = vec3_cross(vec3(1.0, 2.0, 3.0), vec3(4.0, 5.0, 6.0)),
+    CrossFast = fast_cross3(vec3(1.0, 2.0, 3.0), vec3(4.0, 5.0, 6.0)),
+    CrossDiff = vec3_dist(CrossPure, CrossFast),
+    ( if CrossDiff < 1.0e-12 then
+        io.write_string("  [PASS] C FFI vector cross fastpath matches pure Mercury\n", !IO)
+      else
+        io.format("  [FAIL] Cross fastpath distance error: %e\n", [f(CrossDiff)], !IO)
+    ),
+    % 3. Bowring geodetic algorithm test
+    EcefPos = vec3(4500000.0, 2500000.0, 3800000.0),
+    GeoPure = ecef_to_geodetic(EcefPos),
+    GeoFast = fast_bowring_geodetic(EcefPos),
+    LatErr = abs(GeoPure ^ geo_lat - GeoFast ^ geo_lat),
+    LonErr = abs(GeoPure ^ geo_lon - GeoFast ^ geo_lon),
+    AltErr = abs(GeoPure ^ geo_alt - GeoFast ^ geo_alt),
+    ( if (LatErr < 1.0e-10, LonErr < 1.0e-10, AltErr < 1.0e-6) then
+        io.write_string("  [PASS] C FFI Bowring geodetic fastpath matches pure Mercury within sub-millimeter bound\n", !IO)
+      else
+        io.format("  [FAIL] Bowring fastpath error: lat=%e, lon=%e, alt=%e\n",
+                  [f(LatErr), f(LonErr), f(AltErr)], !IO)
+    ),
+    % 4. Monotonic timer test
+    T1 = fast_monotime_ns,
+    T2 = fast_monotime_ns,
+    ( if T2 >= T1 then
+        io.write_string("  [PASS] C FFI POSIX high-resolution monotonic timer verified\n", !IO)
+      else
+        io.write_string("  [FAIL] Monotonic timer went backward\n", !IO)
     ).
