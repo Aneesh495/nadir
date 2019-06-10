@@ -15,6 +15,8 @@ build:
 	cp $(SRC_DIR)/nadir $(BIN_DIR)/nadir
 	cd $(SRC_DIR) && $(MMC) --make test_runner
 	cp $(SRC_DIR)/test_runner $(BIN_DIR)/test_runner
+	cd $(SRC_DIR) && $(MMC) --make bench_runner
+	cp $(SRC_DIR)/bench_runner $(BIN_DIR)/bench_runner
 
 test: all
 	@echo "Running verification checks..."
@@ -26,7 +28,7 @@ test: all
 
 bench: all
 	@echo "Running performance microbenchmarks..."
-	cd $(BENCH_DIR) && $(MMC) --make bench_runner && ./bench_runner
+	$(BIN_DIR)/bench_runner
 
 sim: all
 	$(BIN_DIR)/nadir simulate --demo
@@ -36,7 +38,7 @@ verify: test
 
 clean:
 	rm -rf $(BIN_DIR)
-	rm -rf $(SRC_DIR)/Mercury $(SRC_DIR)/nadir
+	rm -rf $(SRC_DIR)/Mercury $(SRC_DIR)/nadir $(SRC_DIR)/test_runner $(SRC_DIR)/bench_runner
 	rm -rf $(TESTS_DIR)/Mercury $(TESTS_DIR)/test_runner
 	rm -rf $(BENCH_DIR)/Mercury $(BENCH_DIR)/bench_runner
 	find . -name "*.mh" -delete

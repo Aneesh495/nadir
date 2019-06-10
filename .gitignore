@@ -24,6 +24,10 @@ src/*.c
 bin/
 nadir
 test_runner
+bench_runner
+src/nadir
+src/test_runner
+src/bench_runner
 
 # Python artifacts
 __pycache__/
