@@ -1,0 +1,15 @@
+# Global Strategic and Critical Infrastructure Observation Targets Catalog
+# Format: TARGET_ID,TARGET_NAME,LAT_DEG,LON_DEG,ALT_M,PRIORITY,MIN_ELEV_DEG,MAX_OFF_NADIR_DEG,MIN_SOLAR_ELEV_DEG
+# Priority Classes: 0 (Emergency/Critical), 1 (High Priority), 2 (Standard Commercial), 3 (Environmental/Background)
+TGT_SUEZ,Suez Canal Maritime Corridor,30.585200,32.265400,10.0,0,15.00,35.00,10.00
+TGT_PANAMA,Panama Canal Culebra Cut,9.101200,-79.695300,25.0,0,15.00,35.00,10.00
+TGT_MALACCA,Strait of Malacca Maritime Chokepoint,4.210500,100.551800,5.0,0,15.00,35.00,10.00
+TGT_HORMUZ,Strait of Hormuz Tanker Transit,26.566700,56.250000,5.0,0,15.00,35.00,15.00
+TGT_BAB_EL_MANDEB,Bab-el-Mandeb Chokepoint,12.583300,43.333300,5.0,0,15.00,35.00,15.00
+TGT_BOSPHORUS,Bosphorus Strait Maritime Route,41.116700,29.083300,10.0,1,15.00,30.00,10.00
+TGT_ROTTERDAM,Port of Rotterdam Logistics Gateway,51.924400,4.477700,5.0,1,15.00,30.00,10.00
+TGT_SINGAPORE,Port of Singapore Transshipment Hub,1.290200,103.851900,10.0,1,15.00,30.00,10.00
+TGT_AMAZON,Amazon Deforestation Basin Sentinel,-3.465300,-62.215900,80.0,1,15.00,35.00,10.00
+TGT_TOKYO,Tokyo Bay Commercial Shipping Terminal,35.619100,139.779800,10.0,1,15.00,30.00,10.00
+TGT_UKRAINE_ODESA,Black Sea Odesa Grain Terminal,46.482500,30.723300,15.0,0,15.00,35.00,10.00
+TGT_TAIWAN_STRAIT,Taiwan Strait Maritime Watch,24.000000,119.500000,5.0,0,15.00,35.00,10.00
