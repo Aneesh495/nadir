@@ -5,7 +5,7 @@ SRC_DIR = src
 TESTS_DIR = tests
 BENCH_DIR = benchmarks
 
-.PHONY: all clean test bench verify sim build
+.PHONY: all clean test bench verify sim build test-regression test-properties lint
 
 all: build
 
@@ -18,12 +18,22 @@ build:
 	cd $(SRC_DIR) && $(MMC) --make bench_runner
 	cp $(SRC_DIR)/bench_runner $(BIN_DIR)/bench_runner
 
-test: all
-	@echo "Running verification checks..."
+lint:
+	@echo "Verifying absence of forbidden dashes..."
 	$(PYTHON) scripts/verify_no_em_dashes.py
+
+test-regression: all
+	@echo "Running astrodynamics regression suite..."
+	$(PYTHON) -m unittest tests/test_regression.py
+
+test-properties: all
+	@echo "Running property-based invariant test suite..."
+	$(PYTHON) -m unittest tests/test_astrodynamics_properties.py
+
+test: lint all test-regression test-properties
 	@echo "Running Mercury test runner..."
 	$(BIN_DIR)/test_runner
-	@echo "Running Python test suites..."
+	@echo "Running full Python test discovery suite..."
 	$(PYTHON) -m unittest discover -s tests -p "test_*.py"
 
 bench: all
