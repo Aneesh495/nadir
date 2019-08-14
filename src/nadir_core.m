@@ -13,5 +13,6 @@
 :- include_module io_geojson.
 :- include_module sim.
 :- include_module c_fastpath.
+:- include_module regression.
 
 :- implementation.

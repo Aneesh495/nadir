@@ -44,6 +44,7 @@
 :- import_module nadir_core.io_geojson.
 :- import_module nadir_core.sim.
 :- import_module nadir_core.c_fastpath.
+:- import_module nadir_core.regression.
 :- import_module float, int, list, string, math, bool, pair, maybe.
 
 main(!IO) :-
@@ -68,6 +69,7 @@ main(!IO) :-
     test_simulation(!IO),
     test_constellation_benchmark(!IO),
     test_c_fastpath(!IO),
+    run_regression_suite(!IO),
     io.write_string("=== All Engine Unit Tests Passed ===\n", !IO).
 
 :- pred test_isl(io::di, io::uo) is det.
