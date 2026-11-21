@@ -9,7 +9,7 @@ on:
 jobs:
   verify:
     name: Build and Verify
-    runs-on: ubuntu-24.04
+    runs-on: macos-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -21,10 +21,7 @@ jobs:
 
       - name: Install dependencies and Mercury
         run: |
-          curl -fsSL https://paul.bone.id.au/paul.asc | sudo tee /usr/share/keyrings/nadir-mercury.asc >/dev/null
-          echo 'deb [signed-by=/usr/share/keyrings/nadir-mercury.asc] https://dl.mercurylang.org/deb/ noble main' | sudo tee /etc/apt/sources.list.d/nadir-mercury.list >/dev/null
-          sudo apt-get update
-          sudo apt-get install -y build-essential mercury-recommended
+          brew list --versions mercury >/dev/null || brew install mercury
           mmc --version
 
       - name: Verify absence of forbidden punctuation
